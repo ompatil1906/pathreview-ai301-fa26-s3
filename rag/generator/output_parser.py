@@ -53,16 +53,41 @@ def parse_review_output(raw: str) -> list[FeedbackSection]:
     return _parse_plaintext_output(raw)
 
 
-def _parse_json_output(data: dict) -> list[FeedbackSection]:
+def _parse_json_output(data: dict | list) -> list[FeedbackSection]:
     """Parse structured JSON output.
 
     Args:
-        data: Parsed JSON dict
+        data: Parsed JSON dict or list
 
     Returns:
         List of FeedbackSection objects
     """
     sections = []
+
+    # Top-level array: treat each element as a feedback item
+    if isinstance(data, list):
+        for i, item in enumerate(data):
+            if isinstance(item, dict):
+                # Use a generated name or the first key if present
+                section_name = next(iter(item.keys()), f"item_{i}")
+                content = json.dumps(item)
+                suggestions = item.get("suggestions", []) if isinstance(item.get("suggestions"), list) else []
+                section = FeedbackSection(
+                    section_name=section_name,
+                    content=content,
+                    confidence=0.9,
+                    suggestions=suggestions,
+                )
+            else:
+                section = FeedbackSection(
+                    section_name=f"item_{i}",
+                    content=str(item),
+                    confidence=0.85,
+                    suggestions=[],
+                )
+            sections.append(section)
+        logger.info("json_array_output_parsed", section_count=len(sections))
+        return sections
 
     # Handle both single-level and nested structures
     for key, value in data.items():
